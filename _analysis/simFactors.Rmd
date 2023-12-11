@@ -1,0 +1,389 @@
+
+
+
+```{r}
+J = J
+t.b = list()
+2+2
+
+# Constant One Factor
+
+t.b[[1]] = matrix(c(rep(0.008, J), rep(0, J)),J,2) # Low
+t.b[[2]] = matrix(c(rep(0.0137, J), rep(0, J)),J,2) # Mid
+t.b[[3]] = matrix(c(rep(0.0193, J), rep(0, J)),J,2) # High
+
+# Graded 
+
+t.b[[4]] = matrix(c(rep(0.008, J/3), rep(0.010, J/3), rep(0.0137, J/3)
+                  , rep(0, J)),J,2) # Low
+t.b[[5]] = matrix(c(rep(0.008, J/3), rep(0.0137, J/3), rep(0.0193, J/3)
+                    , rep(0, J)),J,2) # Mid
+t.b[[6]] = matrix(c(rep(0.0137, J/3), rep(0.0165, J/3), rep(0.0193, J/3)
+                    , rep(0, J)),J,2) # High
+
+
+# Constant Two Factor
+
+
+t.b1 = c(rep(0.008, J/2), rep(0, J/2))
+t.b2 = c(rep(0, J/2), rep(0.008, J/2))
+t.b[[7]] = cbind(t.b1, t.b2) # Low
+t.b1 = c(rep(0.0137, J/2), rep(0, J/2))
+t.b2 = c(rep(0, J/2), rep(0.0137, J/2))
+t.b[[8]] = cbind(t.b1, t.b2) # Mid
+t.b1 = c(rep(.0193, J/2), rep(0, J/2))
+t.b2 = c(rep(0, J/2), rep(.0193, J/2))
+t.b[[9]] = cbind(t.b1, t.b2) # High
+
+
+# Graded Two Factor
+
+t.b1 = seq(.002, .014, length.out = J)
+t.b2 = rev(seq(.002, .014, length.out = J))
+t.b[[10]] = cbind(t.b1, t.b2) # Low
+t.b1 = seq(.002, .0175, length.out = J)
+t.b2 = rev(seq(.002, .0175, length.out = J))
+t.b[[11]] = cbind(t.b1, t.b2) # Mid
+t.b1 = seq(.0045, .0175, length.out = J)
+t.b2 = rev(seq(.0045, .0175, length.out = J))
+t.b[[12]] = cbind(t.b1, t.b2) # High
+
+
+# Bi-factor
+
+t.b1 = rep(.007, J)
+t.b2 = c(rep(.011, J/2), rep(0, J/2))
+t.b3 = c(rep(0, J/2), rep(0.011, J/2))
+t.b[[13]] = cbind(t.b1, t.b2, t.b3)
+
+t.b1 = rep(.007, 6)
+t.b2 = c(rep(.011, J/3), rep(0, J*2/3))
+t.b3 = c(rep(0, J/3), rep(.011, J/3), rep(0, J/3))
+t.b4 = c(rep(0, J*2/3), rep(0.011, J/3))
+t.b[[14]] = cbind(t.b1, t.b2, t.b3, t.b4)
+```
+
+
+```{r}
+makeTheta = function(I, J, t.b, t.c = 0.025, t.nu = 0.08){
+  Nu = rep(t.nu, J)
+  t.lamb = t.b
+  t.b = apply(t.b, 1, sum)
+  t.a = sqrt(t.c^2-t.b^2)
+  t.delta = diag(t.a^2)
+  Cov = crossprod(t(t.lamb))+t.delta
+  t.cor = cov2cor(Cov)
+  theta = rmvnorm(I, Nu, Cov)
+  return(list(Nu = Nu, P = t.cor, delta = t.delta, Cov = Cov, val = theta))
+}
+t.cor = list()
+I = 200
+for (i in 1:length(t.b)){
+  theta = makeTheta(I = I, J = J, t.b = t.b[[i]])
+  t.cor[[i]] = cov2cor(theta$Cov)
+}
+```
+
+
+
+```{r, fig.height=10, fig.width=7}
+# Install and load necessary packages
+# install.packages("ggplot2")
+# install.packages("reshape2")
+# install.packages("gridExtra")
+
+corr = t.cor[[4]]
+
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(ellipse)
+library(RColorBrewer)
+library(GGally)
+library(ggcorrplot)
+library(cowplot)
+library(ggpubr)
+
+
+
+
+my_colors <- colorRampPalette(c("indianred1", "snow", "cyan4"))(100)
+
+plot_corr <- function(corr, title){
+  ggcorrplot(corr, type = "upper",
+             outline.col = "black",
+             colors = c("firebrick1", "gray95", "deepskyblue2"),
+             lab = T, lab_size = 2.5) +
+    theme(panel.background = element_blank(), 
+          panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(),
+          axis.text = element_blank(),  # Hides axis text (ticks)
+          axis.title.x = element_blank(),  # Hides X axis label
+          axis.title.y = element_blank(),  # Hides Y axis label
+          axis.ticks = element_blank(),
+          legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.text.y = element_blank()) + scale_x_reverse()
+}
+plot_list <- lapply(1:length(t.cor), function(i) plot_corr(t.cor[[i]], paste(i)))
+
+legend_data <- data.frame(cor_value = seq(0, 1, length.out = 100))
+legend_data$y <- 1  # Dummy variable for plotting
+
+# Create the legend plot
+legend_plot <- ggplot(legend_data, aes(x = cor_value, y = y, fill = cor_value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "gray95", high = "deepskyblue4", mid = "deepskyblue1", midpoint = 0.5) +
+  theme_void() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_colourbar(title = "Correlation", title.position = "top", barwidth = 10, barheight = 1))
+
+
+legend_only <- get_legend(legend_plot)
+
+labels <- c(letters[1:14], "legend")  # 14 letters for your plots and 'legend' for the 15th
+
+# Combine your plots with the legend
+plot_list_with_legend <- c(plot_list, list(legend_only))
+# Assuming plot_list_with_legend is a list of your plots
+plot_to_save <- do.call(plot_grid, c(plot_list_with_legend, ncol = 3, nrow = 5, labels = "AUTO"))
+plot_to_save <- plot_to_save + theme(plot.background = element_rect(fill = "white", colour = "white"))
+
+# Save the plot
+ggsave("cor.png", plot_to_save, width = 6.6, height = 8, dpi = 300)
+```
+
+```{r}
+plot(1, type="n", xlim=c(0, 10), ylim=c(0, 10), xlab="", ylab="")
+
+
+```
+
+```{r, fig.height=10}
+col3 = "ivory2"
+col1 = "ivory3"
+col2 = "ivory1"
+library(Cairo)
+CairoPNG("factor.png", width = 800, height = 650)  # Set your desired dimensions
+par(mfrow=c(2,3))
+x=1.5
+library(igraph)
+edges = c("G1", "T1",
+          "G1", "T2",
+          "G1", "T3",
+          "G1", "T4",
+          "G1", "T5",
+          "G1", "T6")
+
+g = graph(edges)
+layout = matrix(c(-5, rep(0, 6), 0, 
+                  seq(-10,10,length.out = 6)), ncol = 2)
+V(g)$size = c(55, rep(35, 6))
+V(g)$color = c(col3, rep(col2, 6))
+V(g)$label = c(expression(G),
+               expression(t[1]),
+               expression(t[2]),
+               expression(t[3]),
+               expression(t[4]),
+               expression(t[5]),
+               expression(t[6]))
+par(mar = c(1, 1, 1, 1))
+plot(g, layout = layout, 
+     vertex.label.cex=2*x, 
+     edge.arrow.size = 0, 
+     edge.label.dist = 1.2,
+     edge.label.cex = 1*x,
+     edge.width = 13.7/2
+)
+edges = c("G1", "T1",
+          "G1", "T2",
+          "G1", "T3",
+          "G1", "T4",
+          "G1", "T5",
+          "G1", "T6")
+g = graph(edges)
+layout = matrix(c(-5, rep(0, 6), 0, 
+                  seq(-10,10,length.out = 6)), ncol = 2)
+V(g)$size = c(55, rep(35, 6))
+V(g)$color = c(col3, rep(col2, 6))
+V(g)$label = c(expression(G),
+               expression(t[1]),
+               expression(t[2]),
+               expression(t[3]),
+               expression(t[4]),
+               expression(t[5]),
+               expression(t[6]))
+par(mar = c(1, 1, 1, 1))
+plot(g, layout = layout, 
+     vertex.label.cex=2*x, 
+     edge.arrow.size = 0,
+     edge.label.dist = 1.2,
+     edge.label.cex = 1*x,
+     edge.width = rev(c(8, 8, 13.7, 13.7, 19.3, 19.3))/2
+)
+edges = c("S1", "T1",
+          "T2", "S1",
+          "T3", "S1",
+          "S2", "T4",
+          "T5", "S2",
+          "T6", "S2")
+
+g = graph(edges)
+layout = matrix(c(-5, rep(0, 3), 5, rep(0,3), 0,
+                  seq(-10,-2,length.out = 3), 0, 
+                  seq(2,10,length.out = 3)), ncol = 2)
+V(g)$size = c(40, rep(35, 3), 40, rep(35, 3))
+V(g)$color = c(col1, rep(col2, 3), col1, rep(col2, 3))
+V(g)$label = c(expression(S[1]),
+               expression(t[1]),
+               expression(t[2]),
+               expression(t[3]),
+               expression(S[2]),
+               expression(t[4]),
+               expression(t[5]),
+               expression(t[6]))
+par(mar = c(1, 1, 1, 1))
+plot(g, layout = layout, 
+     vertex.label.cex=2*x, 
+     edge.arrow.size = 0,
+     edge.label.dist = 1.2,
+     edge.label.cex = 1*x,
+     edge.width = 13.7/2
+)
+edges = c("G1", "T1",
+          "G1", "T2",
+          "G1", "T3",
+          "G1", "T4",
+          "G1", "T5",
+          "G1", "T6",
+          "G2", "T1",
+          "G2", "T2",
+          "G2", "T3",
+          "G2", "T4",
+          "G2", "T5",
+          "G2", "T6")
+
+g = graph(edges)
+layout = matrix(c(-5, rep(0, 6), 5, 0, 
+                  seq(-10,10,length.out = 6), 0), ncol = 2)
+V(g)$size = c(55, rep(35, 6), 55)
+V(g)$color = c(col3, rep(col2, 6), col3)
+V(g)$label = c(expression(G[1]),
+               expression(t[1]),
+               expression(t[2]),
+               expression(t[3]),
+               expression(t[4]),
+               expression(t[5]),
+               expression(t[6]),
+               expression(G[2]))
+par(mar = c(1, 1, 1, 1))
+plot(g, layout = layout, 
+     vertex.label.cex=2*x, 
+     edge.arrow.size = 0,
+     edge.label.dist = 1.2,
+     edge.label.cex = 1*x,
+     edge.width = c(2,5,8,11,14,17,
+                      rev(c(2,5,8,11,14,17)))/2
+)
+edges = c("T1", "G",
+          "T2", "G",
+          "T3", "G",
+          "T4", "G",
+          "T5", "G",
+          "T6", "G",
+          "T1", "S1",
+          "T3", "S1",
+          "T5", "S2",
+          "T2", "S1",
+          "T4", "S2",
+          "T6", "S2")
+g = graph(edges)
+layout = matrix(c(
+  -8, 12,  # was -6
+  -16, 7,  # was -14
+  -8, 10,  # was -6
+  -8, 8,   # was -6
+  -8, 6,   # was -6
+  -8, 4,   # was -6
+  -8, 2,   # was -6
+  0, 10,    # was 2
+  0, 4),   # was 2
+  ncol = 2, byrow = TRUE)
+V(g)$size = c(30, 55, rep(30, 5), rep(40, 2))
+V(g)$color = c(col2, col3, rep(col2, 5), rep(col1, 2))
+V(g)$label = c(expression(t[1]),
+               expression(G),
+               expression(t[2]),
+               expression(t[3]),
+               expression(t[4]),
+               expression(t[5]),
+               expression(t[6]),
+               expression(S[1]),
+               expression(S[2]))
+par(mar = c(1, 1, 1, 1))
+plot(g, layout = layout, 
+     vertex.label.cex=2*x, 
+     edge.arrow.size = 0,
+     edge.label.dist = 1.2,
+     edge.label.cex = 1*x,
+     edge.width = c(rep(7,6),rep(11,6))/2
+)
+edges = c("T1", "G",
+          "T2", "G",
+          "T3", "G",
+          "T4", "G",
+          "T5", "G",
+          "T6", "G",
+          "T1", "S1",
+          "T2", "S1",
+          "T3", "S2",
+          "T4", "S2",
+          "T5", "S3",
+          "T6", "S3")
+g = graph(edges)
+layout = matrix(c(
+  -8, 12,  # was -6
+  -16, 7,  # was -14
+  -8, 10,  # was -6
+  -8, 8,   # was -6
+  -8, 6,   # was -6
+  -8, 4,   # was -6
+  -8, 2,   # was -6
+  0, 12,    # was 2
+  0, 7,
+  0, 2),   # was 2
+  ncol = 2, byrow = TRUE)
+V(g)$size = c(30, 55, rep(30, 5), rep(35, 3))
+V(g)$color = c(col2, col3, rep(col2, 5), rep(col1, 3))
+V(g)$label = c(expression(t[1]),
+               expression(G),
+               expression(t[2]),
+               expression(t[3]),
+               expression(t[4]),
+               expression(t[5]),
+               expression(t[6]),
+               expression(S[1]),
+               expression(S[2]),
+               expression(S[3]))
+par(mar = c(1, 1, 1, 1))
+plot(g, layout = layout, 
+     vertex.label.cex=2*x, 
+     edge.arrow.size = 0,
+     edge.label.dist = 1.2,
+     edge.label.cex = 1*x,
+     edge.width = c(rep(7,6),rep(11,6))/2
+)
+mtext(expression(bold("A")), side = 3, line = -4, adj = 0.05, cex = 2, font = 2, outer = TRUE)
+title(bquote(bold("A")), outer = TRUE, line = -3,
+      adj = .38, cex.main = 3)
+title("C", outer = TRUE, line = -3,
+      adj = .72, cex.main = 3)
+title("E", outer = TRUE, line = -40,
+      adj = 0.05, cex.main = 3)
+title("F", outer = TRUE, line = -40,
+      adj = .38, cex.main = 3)
+title("G", outer = TRUE, line = -40,
+      adj = .72, cex.main = 3)
+
+dev.off()
+```
